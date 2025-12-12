@@ -4,45 +4,42 @@ import sqlite3
 from datetime import datetime
 
 # --- CẤU HÌNH TRANG ---
-st.set_page_config(page_title="Phat Gear", layout="wide")
+st.set_page_config(page_title="PGear", layout="wide")
 
-# --- CSS FIX LỖI SCROLL & GIAO DIỆN ---
+# --- CSS GIAO DIỆN DARK MODE (TEXT ONLY) ---
 st.markdown("""
 <style>
-    /* 1. MỞ KHÓA THANH CUỘN (FIX LỖI KHÔNG KÉO ĐƯỢC) */
-    .stApp {
-        overflow-y: auto !important;
-        height: 100vh;
-    }
-    
-    /* 2. MÀU SẮC GIAO DIỆN */
+    /* --- 1. MÀU SẮC --- */
     :root {
+        --bg-color: #0e1117;
+        --card-bg: #1e252b;
         --primary: #29b5e8;         /* Xanh dương */
         --success: #00c853;         /* Xanh lá */
         --danger: #ff5252;          /* Đỏ */
         --text-sub: #9e9e9e;        /* Xám */
     }
 
-    /* 3. TÙY CHỈNH THẺ CARD (Khi dùng border=True) */
-    div[data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #1e252b; /* Nền thẻ tối */
+    /* --- 2. CARD SẢN PHẨM --- */
+    div.stContainer {
+        background-color: var(--card-bg);
         border: 1px solid #30363d;
-        border-radius: 8px;
-        padding: 1rem;
+        border-radius: 6px;
+        padding: 1.2rem;
         margin-bottom: 1rem;
     }
 
-    /* 4. INPUTS */
+    /* --- 3. INPUTS --- */
     .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] {
         background-color: #0e1117 !important;
         color: white !important;
         border: 1px solid #30363d !important;
+        border-radius: 4px;
     }
     .stTextInput input:focus, .stNumberInput input:focus {
         border-color: var(--primary) !important;
     }
 
-    /* 5. METRICS */
+    /* --- 4. METRICS --- */
     div[data-testid="stMetricValue"] {
         font-size: 1.8rem !important;
         color: var(--primary) !important;
@@ -55,10 +52,11 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* 6. BUTTONS */
+    /* --- 5. BUTTONS --- */
     .stButton button {
         border-radius: 4px;
         font-weight: 600;
+        border: none;
         text-transform: uppercase;
         font-size: 0.8rem;
     }
@@ -66,13 +64,17 @@ st.markdown("""
         background-color: var(--primary) !important;
         color: #000 !important;
     }
+    .stButton button[type="primary"]:hover {
+        background-color: #0099cc !important;
+        color: white !important;
+    }
     .stButton button[type="secondary"] {
         background-color: #2d333b !important;
         color: #c9d1d9 !important;
         border: 1px solid #30363d !important;
     }
-
-    /* Ẩn hướng dẫn thừa */
+    
+    /* Ẩn hướng dẫn input */
     div[data-testid="InputInstructions"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -96,7 +98,7 @@ def init_db():
             date_added TEXT
         )
     ''')
-    # Tự động thêm cột condition nếu file DB cũ chưa có
+    # Migration
     c.execute("PRAGMA table_info(products)")
     columns = [info[1] for info in c.fetchall()]
     if 'condition' not in columns:
@@ -166,7 +168,7 @@ def main():
     # --- HEADER ---
     c_head_1, c_head_2 = st.columns([6, 1])
     with c_head_1:
-        st.title("PHAT GEAR MANAGER")
+        st.title("PGEAR MANAGER")
     with c_head_2:
         if st.button("REFRESH"):
             st.rerun()
@@ -188,14 +190,14 @@ def main():
     
     st.divider()
 
-    # --- SEARCH & FILTER ---
+    # --- FILTER ---
     c_search, c_filter = st.columns([3, 1])
     with c_search:
         search_query = st.text_input("", placeholder="Tìm kiếm tên sản phẩm...", label_visibility="collapsed").lower()
     with c_filter:
         view_filter = st.selectbox("", ["Tất cả", "Sẵn hàng", "Đã bán"], label_visibility="collapsed")
 
-    # --- PRODUCT LIST ---
+    # --- LIST ---
     if not df.empty:
         df_display = df.copy()
         if search_query:
@@ -210,9 +212,8 @@ def main():
             for col, item in zip(cols, row.iterrows()):
                 item_data = item[1]
                 with col:
-                    # Dùng border=True của Streamlit để tạo khung chắc chắn hơn
-                    with st.container(border=True):
-                        # 1. STATUS BADGE
+                    with st.container():
+                        # STATUS BADGE
                         is_sold = item_data['status'] == "Đã bán"
                         st_text = "ĐÃ BÁN" if is_sold else "SẴN HÀNG"
                         st_color = "#00c853" if is_sold else "#29b5e8"
@@ -229,23 +230,25 @@ def main():
                             unsafe_allow_html=True
                         )
                         
-                        # 2. TÊN SẢN PHẨM
+                        # NAME
                         st.markdown(f"#### {item_data['name']}")
                         
-                        # 3. THÔNG TIN PHỤ
+                        # INFO ROW
                         cond_display = item_data['condition'] if item_data['condition'] else "---"
                         st.caption(f"Tình trạng: {cond_display}  |  BH: {item_data['warranty_info']}")
-                        
-                        st.markdown("---")
 
-                        # 4. BẢNG GIÁ (3 CỘT)
+                        # --- PRICE SECTION (3 COLUMNS) ---
+                        # Chia làm 3 cột rõ ràng: Nhập - Bán - Lãi
                         p1, p2, p3 = st.columns(3)
+                        
                         with p1:
                             st.caption("GIÁ NHẬP")
                             st.markdown(f"**{item_data['buy_price']:,.0f}**")
+                            
                         with p2:
                             st.caption("GIÁ BÁN")
                             st.markdown(f"**{item_data['sell_price']:,.0f}**")
+                            
                         with p3:
                             st.caption("LỢI NHUẬN")
                             profit = item_data['sell_price'] - item_data['buy_price']
@@ -254,7 +257,7 @@ def main():
 
                         st.markdown("<div style='margin-top: 15px'></div>", unsafe_allow_html=True)
                         
-                        # 5. BUTTONS
+                        # BUTTONS
                         b1, b2 = st.columns([2, 1])
                         if b1.button("HOÀN TÁC" if is_sold else "BÁN NGAY", key=f"btn_s_{item_data['id']}", type="secondary" if is_sold else "primary"):
                             update_status(item_data['id'], "Sẵn hàng" if is_sold else "Đã bán")
