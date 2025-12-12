@@ -5,7 +5,6 @@ import os
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
-# --- CẤU HÌNH TRANG (MẶC ĐỊNH GIẤU SIDEBAR) ---
 st.set_page_config(
     page_title="PGear", 
     layout="wide",
@@ -14,7 +13,6 @@ st.set_page_config(
 url = "https://www.facebook.com/thanh.phat.114166"
 
 link_text ="Thanh Phat"
-# --- CSS TỐI GIẢN ---
 st.markdown("""
 <style>
     .stApp { overflow-y: auto !important; height: 100vh; }
@@ -37,11 +35,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- QUẢN LÝ TRẠNG THÁI ---
 if 'is_admin' not in st.session_state: st.session_state.is_admin = False
 if 'show_login' not in st.session_state: st.session_state.show_login = False
 
-# --- KẾT NỐI GOOGLE SHEETS ---
 @st.cache_resource
 def connect_to_sheet():
     SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -100,48 +96,35 @@ def delete_product(product_id):
         st.cache_data.clear()
     except: pass
 def get_admin_password():
-    """Lấy mật khẩu admin từ secrets.toml, không hardcode"""
     try:
-        # Ưu tiên lấy từ secrets.toml
         if "admin_password" in st.secrets:
             return st.secrets["admin_password"]
-        # Nếu có section [general]
         elif "general" in st.secrets and "admin_password" in st.secrets["general"]:
             return st.secrets["general"]["admin_password"]
         else:
-            st.error("⚠️ Chưa cấu hình mật khẩu admin trong secrets.toml")
-            st.info("Vui lòng thêm vào file `.streamlit/secrets.toml`:\n```\nadmin_password = \"your_password_here\"\n```")
             st.stop()
     except Exception as e:
         st.error(f"Lỗi đọc secrets: {e}")
         st.stop()
-# --- MAIN APP ---
 def main():
-    # --- HEADER ---
     c_head_1, c_head_2 = st.columns([6, 1])
     with c_head_1:
         st.title("PGEAR")
 
-    # --- LOAD DATA ---
     df = load_data()
 
-    # --- KHU VỰC TÌM KIẾM & BỘ LỌC LOẠI HÀNG ---
     c_search, c_filter = st.columns([3, 1])
     with c_search:
         search_query = st.text_input("", placeholder="Tìm kiếm sản phẩm...", label_visibility="collapsed",key="search_input", autocomplete="off")
     
     with c_filter:
-        # LẤY DANH SÁCH LOẠI HÀNG TỰ ĐỘNG TỪ DATA
         if not df.empty:
-            # Lấy các loại hàng duy nhất, loại bỏ dòng trống
             categories = ["Tất cả"] + sorted(df['category'].dropna().unique().tolist())
         else:
             categories = ["Tất cả"]
             
-        # Dropdown giờ là Loại Hàng chứ không phải Trạng Thái
         view_category = st.selectbox("", categories, label_visibility="collapsed")
 
-    # --- LOGIC MẬT MÃ BÍ MẬT ---
     if search_query == "#login#":
         st.session_state.show_login = True
         search_query = ""
@@ -159,7 +142,6 @@ def main():
                 else:
                     st.error("Sai mật khẩu!")
 
-    # --- SIDEBAR (ADMIN ONLY) ---
     if st.session_state.is_admin:
         with st.sidebar:
 
@@ -184,7 +166,6 @@ def main():
                         st.success("Đã lưu!")
                         st.rerun()
 
-    # --- METRICS ---
     if not df.empty:
         df['buy_price'] = pd.to_numeric(df['buy_price'], errors='coerce').fillna(0)
         df['sell_price'] = pd.to_numeric(df['sell_price'], errors='coerce').fillna(0)
@@ -205,24 +186,14 @@ def main():
             st.caption(f"Facebook: [{link_text}]({url})")
     
 
-    # --- DANH SÁCH HÀNG HÓA ---
     if not df.empty:
         df_display = df.copy()
-        
-        # 1. Lọc theo Tên (Search)
         if search_query and search_query != "#login#":
             df_display = df_display[df_display['name'].astype(str).str.lower().str.contains(search_query.lower())]
-        
-        # 2. Lọc theo Loại Hàng (Category Filter) - THAY CHO STATUS
         if view_category != "Tất cả":
             df_display = df_display[df_display['category'] == view_category]
-
-        # 3. Lọc theo Quyền (QUAN TRỌNG)
-        # Nếu là KHÁCH: Chỉ cho xem hàng Sẵn, KHÔNG xem hàng đã bán
         if not st.session_state.is_admin:
             df_display = df_display[df_display['status'] == 'Sẵn hàng']
-        # Nếu là ADMIN: Xem hết (để còn biết mà quản lý)
-
         rows = [df_display.iloc[i:i + 3] for i in range(0, len(df_display), 3)]
 
         for row in rows:
@@ -231,7 +202,6 @@ def main():
                 item_data = item[1]
                 with col:
                     with st.container(border=True):
-                        # STATUS & CATEGORY
                         is_sold = item_data['status'] == "Đã bán"
                         st_text = "ĐÃ BÁN" if is_sold else "SẴN HÀNG"
                         st_color = "#00c853" if is_sold else "#29b5e8"
@@ -246,8 +216,6 @@ def main():
                         cond_display = item_data['condition'] if item_data['condition'] else "---"
                         st.caption(f"Tình trạng: {cond_display}  |  BH: {item_data['warranty_info']}")
                         st.markdown("---")
-
-                        # PHÂN QUYỀN HIỂN THỊ
                         if st.session_state.is_admin:
                             p1, p2, p3 = st.columns(3)
                             with p1:
@@ -272,7 +240,6 @@ def main():
                                 with st.spinner("..."): delete_product(item_data['id'])
                                 st.rerun()
                         else:
-                            # KHÁCH CHỈ THẤY GIÁ BÁN
                             st.caption("GIÁ BÁN")
                             st.markdown(f"<h3 style='color: #29b5e8; margin:0'>{item_data['sell_price']:,.0f} VNĐ</h3>", unsafe_allow_html=True)
                             
