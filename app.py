@@ -6,7 +6,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
 # --- CẤU HÌNH TRANG ---
-st.set_page_config(page_title="Phat Gear", layout="wide")
+st.set_page_config(page_title="PGear", layout="wide")
 
 # --- CSS GIAO DIỆN (GIỮ NGUYÊN BẢN ĐẸP NHẤT) ---
 st.markdown("""
