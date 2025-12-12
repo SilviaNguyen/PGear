@@ -1,182 +1,146 @@
 import streamlit as st
 import pandas as pd
-import sqlite3
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
 # --- CẤU HÌNH TRANG ---
-st.set_page_config(page_title="PGear", layout="wide")
+st.set_page_config(page_title="Phat Gear", layout="wide")
 
-# --- CSS GIAO DIỆN DARK MODE (TEXT ONLY) ---
+# --- CSS GIAO DIỆN (GIỮ NGUYÊN BẢN ĐẸP NHẤT) ---
 st.markdown("""
 <style>
-    /* --- 1. MÀU SẮC --- */
+    .stApp { overflow-y: auto !important; height: 100vh; }
     :root {
-        --bg-color: #0e1117;
-        --card-bg: #1e252b;
-        --primary: #29b5e8;         /* Xanh dương */
-        --success: #00c853;         /* Xanh lá */
-        --danger: #ff5252;          /* Đỏ */
-        --text-sub: #9e9e9e;        /* Xám */
+        --primary: #29b5e8; --success: #00c853; --danger: #ff5252; --text-sub: #9e9e9e;
     }
-
-    /* --- 2. CARD SẢN PHẨM --- */
-    div.stContainer {
-        background-color: var(--card-bg);
-        border: 1px solid #30363d;
-        border-radius: 6px;
-        padding: 1.2rem;
-        margin-bottom: 1rem;
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #1e252b; border: 1px solid #30363d; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;
     }
-
-    /* --- 3. INPUTS --- */
     .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] {
-        background-color: #0e1117 !important;
-        color: white !important;
-        border: 1px solid #30363d !important;
-        border-radius: 4px;
+        background-color: #0e1117 !important; color: white !important; border: 1px solid #30363d !important;
     }
-    .stTextInput input:focus, .stNumberInput input:focus {
-        border-color: var(--primary) !important;
-    }
-
-    /* --- 4. METRICS --- */
-    div[data-testid="stMetricValue"] {
-        font-size: 1.8rem !important;
-        color: var(--primary) !important;
-        font-weight: 700;
-    }
-    div[data-testid="stMetricLabel"] {
-        color: var(--text-sub) !important;
-        font-size: 0.8rem !important;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-
-    /* --- 5. BUTTONS --- */
-    .stButton button {
-        border-radius: 4px;
-        font-weight: 600;
-        border: none;
-        text-transform: uppercase;
-        font-size: 0.8rem;
-    }
-    .stButton button[type="primary"] {
-        background-color: var(--primary) !important;
-        color: #000 !important;
-    }
-    .stButton button[type="primary"]:hover {
-        background-color: #0099cc !important;
-        color: white !important;
-    }
-    .stButton button[type="secondary"] {
-        background-color: #2d333b !important;
-        color: #c9d1d9 !important;
-        border: 1px solid #30363d !important;
-    }
-    
-    /* Ẩn hướng dẫn input */
+    div[data-testid="stMetricValue"] { font-size: 1.8rem !important; color: var(--primary) !important; font-weight: 700; }
+    div[data-testid="stMetricLabel"] { color: var(--text-sub) !important; font-size: 0.8rem !important; text-transform: uppercase; }
+    .stButton button { border-radius: 4px; font-weight: 600; text-transform: uppercase; font-size: 0.8rem; }
+    .stButton button[type="primary"] { background-color: var(--primary) !important; color: #000 !important; }
+    .stButton button[type="secondary"] { background-color: #2d333b !important; color: #c9d1d9 !important; border: 1px solid #30363d !important; }
     div[data-testid="InputInstructions"] { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- DATABASE ---
-DB_FILE = "gear_database.db"
+# --- KẾT NỐI GOOGLE SHEETS ---
+SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+SHEET_NAME = "PhatGear_DB" # Đảm bảo tên file trên Google Drive đúng y hệt thế này
 
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            category TEXT,
-            buy_price REAL,
-            sell_price REAL,
-            status TEXT,
-            condition TEXT,
-            warranty_info TEXT,
-            date_added TEXT
-        )
-    ''')
-    # Migration
-    c.execute("PRAGMA table_info(products)")
-    columns = [info[1] for info in c.fetchall()]
-    if 'condition' not in columns:
+# Hàm kết nối (có cache để không phải kết nối lại liên tục)
+@st.cache_resource
+def connect_to_sheet():
+    # Cách 1: Chạy Local (Dùng file json)
+    try:
+        creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", SCOPE)
+        client = gspread.authorize(creds)
+        sheet = client.open(SHEET_NAME).sheet1
+        return sheet
+    except Exception as e:
+        # Cách 2: Chạy trên Streamlit Cloud (Dùng Secrets)
         try:
-            c.execute("ALTER TABLE products ADD COLUMN condition TEXT")
+            # Tạo dict từ secrets
+            creds_dict = dict(st.secrets["gcp_service_account"])
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+            client = gspread.authorize(creds)
+            sheet = client.open(SHEET_NAME).sheet1
+            return sheet
         except:
-            pass
-    conn.commit()
-    conn.close()
+            st.error("Lỗi kết nối: Không tìm thấy file 'service_account.json' hoặc cấu hình Secrets.")
+            st.stop()
 
 def load_data():
-    conn = sqlite3.connect(DB_FILE)
-    df = pd.read_sql_query("SELECT * FROM products ORDER BY id DESC", conn)
-    conn.close()
+    sheet = connect_to_sheet()
+    data = sheet.get_all_records()
+    df = pd.DataFrame(data)
+    # Nếu sheet trống, trả về dataframe rỗng với đúng cột
+    if df.empty:
+        return pd.DataFrame(columns=['id', 'name', 'category', 'buy_price', 'sell_price', 'status', 'condition', 'warranty_info', 'date_added'])
+    
+    # Sắp xếp ID giảm dần (Mới nhất lên đầu)
+    if 'id' in df.columns:
+        df = df.sort_values(by='id', ascending=False)
     return df
 
 def add_product(name, category, buy_price, sell_price, condition, warranty_info):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
+    sheet = connect_to_sheet()
+    data = sheet.get_all_records()
+    
+    # Tự động tạo ID mới (Max ID + 1)
+    if not data:
+        new_id = 1
+    else:
+        ids = [row['id'] for row in data if str(row['id']).isdigit()]
+        new_id = max(ids) + 1 if ids else 1
+        
     date_added = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    c.execute("""
-        INSERT INTO products (name, category, buy_price, sell_price, status, condition, warranty_info, date_added)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (name, category, buy_price, sell_price, "Sẵn hàng", condition, warranty_info, date_added))
-    conn.commit()
-    conn.close()
+    
+    # Thêm dòng mới vào sheet
+    new_row = [new_id, name, category, buy_price, sell_price, "Sẵn hàng", condition, warranty_info, date_added]
+    sheet.append_row(new_row)
+    st.cache_data.clear() # Xóa cache để load lại dữ liệu mới
 
 def update_status(product_id, new_status):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("UPDATE products SET status = ? WHERE id = ?", (new_status, product_id))
-    conn.commit()
-    conn.close()
+    sheet = connect_to_sheet()
+    # Tìm dòng chứa ID (Lưu ý: Sheet tính dòng 1 là Header, nên +2 nếu tính index từ 0 của python tìm thấy)
+    cell = sheet.find(str(product_id), in_column=1) 
+    if cell:
+        # Cập nhật cột Status (Cột thứ 6)
+        sheet.update_cell(cell.row, 6, new_status)
+        st.cache_data.clear()
 
 def delete_product(product_id):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("DELETE FROM products WHERE id = ?", (product_id,))
-    conn.commit()
-    conn.close()
+    sheet = connect_to_sheet()
+    cell = sheet.find(str(product_id), in_column=1)
+    if cell:
+        sheet.delete_rows(cell.row)
+        st.cache_data.clear()
 
-# --- MAIN ---
+# --- MAIN APP ---
 def main():
-    init_db()
-    
     # --- SIDEBAR ---
     with st.sidebar:
         st.header("NHẬP KHO")
         with st.form("add_form", clear_on_submit=True):
-            name = st.text_input("Tên sản phẩm", placeholder="VD: Chuột Logitech G Pro...")
+            name = st.text_input("Tên sản phẩm", placeholder="VD: Chuột Logitech...")
             category = st.selectbox("Loại", ["Chuột", "Bàn phím", "Tai nghe", "Lót chuột", "Ghế", "Khác"])
-            
             c1, c2 = st.columns(2)
             buy = c1.number_input("Giá nhập", step=50000, format="%d")
             sell = c2.number_input("Giá bán", step=50000, format="%d")
-            
-            condition = st.text_input("Tình trạng", placeholder="VD: Fullbox, Nobox...")
+            condition = st.text_input("Tình trạng", placeholder="VD: Fullbox...")
             warranty = st.text_input("Bảo hành", placeholder="VD: 12T Hãng")
             
             if st.form_submit_button("LƯU SẢN PHẨM", type="primary"):
                 if name:
                     cond_val = condition if condition else "---"
-                    add_product(name, category, buy, sell, cond_val, warranty)
-                    st.success("Đã thêm!")
+                    with st.spinner("Đang lưu lên mây..."):
+                        add_product(name, category, buy, sell, cond_val, warranty)
+                    st.success("Đã lưu thành công!")
                     st.rerun()
 
     # --- HEADER ---
     c_head_1, c_head_2 = st.columns([6, 1])
     with c_head_1:
-        st.title("PGEAR MANAGER")
+        st.title("PGear")
     with c_head_2:
         if st.button("REFRESH"):
+            st.cache_data.clear() # Xóa cache để ép tải lại từ Google Sheet
             st.rerun()
 
     df = load_data()
 
     # --- METRICS ---
     if not df.empty:
+        # Đảm bảo cột giá là số (phòng khi nhập sai trên sheet)
+        df['buy_price'] = pd.to_numeric(df['buy_price'], errors='coerce').fillna(0)
+        df['sell_price'] = pd.to_numeric(df['sell_price'], errors='coerce').fillna(0)
+        
         df['Lợi nhuận'] = df['sell_price'] - df['buy_price']
         inventory = df[df['status'] == 'Sẵn hàng']
         sold = df[df['status'] == 'Đã bán']
@@ -190,18 +154,17 @@ def main():
     
     st.divider()
 
-    # --- FILTER ---
+    # --- SEARCH & LIST ---
     c_search, c_filter = st.columns([3, 1])
     with c_search:
         search_query = st.text_input("", placeholder="Tìm kiếm tên sản phẩm...", label_visibility="collapsed").lower()
     with c_filter:
         view_filter = st.selectbox("", ["Tất cả", "Sẵn hàng", "Đã bán"], label_visibility="collapsed")
 
-    # --- LIST ---
     if not df.empty:
         df_display = df.copy()
         if search_query:
-            df_display = df_display[df_display['name'].str.lower().str.contains(search_query)]
+            df_display = df_display[df_display['name'].astype(str).str.lower().str.contains(search_query)]
         if view_filter != "Tất cả":
             df_display = df_display[df_display['status'] == view_filter]
 
@@ -212,43 +175,28 @@ def main():
             for col, item in zip(cols, row.iterrows()):
                 item_data = item[1]
                 with col:
-                    with st.container():
-                        # STATUS BADGE
+                    with st.container(border=True):
+                        # STATUS
                         is_sold = item_data['status'] == "Đã bán"
                         st_text = "ĐÃ BÁN" if is_sold else "SẴN HÀNG"
                         st_color = "#00c853" if is_sold else "#29b5e8"
                         
-                        st.markdown(
-                            f"""
+                        st.markdown(f"""
                             <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                                <span style="color:{st_color}; font-weight:bold; border:1px solid {st_color}; padding:2px 8px; border-radius:4px; font-size:0.7rem; letter-spacing: 1px;">
-                                    {st_text}
-                                </span>
+                                <span style="color:{st_color}; font-weight:bold; border:1px solid {st_color}; padding:2px 8px; border-radius:4px; font-size:0.7rem; letter-spacing: 1px;">{st_text}</span>
                                 <span style="color:#9e9e9e; font-size:0.7rem; text-transform:uppercase;">{item_data['category']}</span>
-                            </div>
-                            """, 
-                            unsafe_allow_html=True
-                        )
+                            </div>""", unsafe_allow_html=True)
                         
-                        # NAME
                         st.markdown(f"#### {item_data['name']}")
-                        
-                        # INFO ROW
                         cond_display = item_data['condition'] if item_data['condition'] else "---"
                         st.caption(f"Tình trạng: {cond_display}  |  BH: {item_data['warranty_info']}")
-
-                        # --- PRICE SECTION (3 COLUMNS) ---
-                        # Chia làm 3 cột rõ ràng: Nhập - Bán - Lãi
                         p1, p2, p3 = st.columns(3)
-                        
                         with p1:
                             st.caption("GIÁ NHẬP")
                             st.markdown(f"**{item_data['buy_price']:,.0f}**")
-                            
                         with p2:
                             st.caption("GIÁ BÁN")
                             st.markdown(f"**{item_data['sell_price']:,.0f}**")
-                            
                         with p3:
                             st.caption("LỢI NHUẬN")
                             profit = item_data['sell_price'] - item_data['buy_price']
@@ -257,17 +205,18 @@ def main():
 
                         st.markdown("<div style='margin-top: 15px'></div>", unsafe_allow_html=True)
                         
-                        # BUTTONS
                         b1, b2 = st.columns([2, 1])
                         if b1.button("HOÀN TÁC" if is_sold else "BÁN NGAY", key=f"btn_s_{item_data['id']}", type="secondary" if is_sold else "primary"):
-                            update_status(item_data['id'], "Sẵn hàng" if is_sold else "Đã bán")
+                            with st.spinner("Đang cập nhật..."):
+                                update_status(item_data['id'], "Sẵn hàng" if is_sold else "Đã bán")
                             st.rerun()
                         
                         if b2.button("XÓA", key=f"btn_d_{item_data['id']}", type="secondary"):
-                            delete_product(item_data['id'])
+                            with st.spinner("Đang xóa..."):
+                                delete_product(item_data['id'])
                             st.rerun()
     else:
-        st.info("Chưa có dữ liệu.")
+        st.info("Empty")
 
 if __name__ == "__main__":
     main()
