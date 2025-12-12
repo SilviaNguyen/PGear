@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import gspread
+import os
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
@@ -36,25 +37,24 @@ SHEET_NAME = "PhatGear_DB" # Đảm bảo tên file trên Google Drive đúng y 
 # Hàm kết nối (có cache để không phải kết nối lại liên tục)
 @st.cache_resource
 def connect_to_sheet():
-    # Cách 1: Chạy Local (Dùng file json)
-    try:
+    SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    
+    # TRƯỜNG HỢP 1: CHẠY LOCAL (Có file json trên máy)
+    if os.path.exists("service_account.json"):
         creds = ServiceAccountCredentials.from_json_keyfile_name("service_account.json", SCOPE)
-        client = gspread.authorize(creds)
-        sheet = client.open(SHEET_NAME).sheet1
-        return sheet
-    except Exception as e:
-        # Cách 2: Chạy trên Streamlit Cloud (Dùng Secrets)
-        try:
-            # Tạo dict từ secrets
-            creds_dict = dict(st.secrets["gcp_service_account"])
-            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
-            client = gspread.authorize(creds)
-            sheet = client.open(SHEET_NAME).sheet1
-            return sheet
-        except:
-            st.error("Lỗi kết nối: Không tìm thấy file 'service_account.json' hoặc cấu hình Secrets.")
-            st.stop()
-
+    
+    # TRƯỜNG HỢP 2: CHẠY TRÊN CLOUD (Không có file, lấy từ Secrets)
+    elif "gcp_service_account" in st.secrets:
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, SCOPE)
+    
+    else:
+        st.error("Lỗi: Không tìm thấy file 'service_account.json' và cũng không có cấu hình Secrets!")
+        st.stop()
+        
+    client = gspread.authorize(creds)
+    sheet = client.open("PhatGear_DB").sheet1 # Đảm bảo tên file trên Drive đúng là PhatGear_DB
+    return sheet
 def load_data():
     sheet = connect_to_sheet()
     data = sheet.get_all_records()
