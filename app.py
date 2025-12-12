@@ -215,7 +215,6 @@ def main():
                         st.markdown(f"#### {item_data['name']}")
                         cond_display = item_data['condition'] if item_data['condition'] else "---"
                         st.caption(f"Tình trạng: {cond_display}  |  BH: {item_data['warranty_info']}")
-                        st.markdown("---")
                         if st.session_state.is_admin:
                             p1, p2, p3 = st.columns(3)
                             with p1:
