@@ -234,9 +234,30 @@ def main():
 
     if not st.session_state.is_admin:
         st.markdown("---")
-        c1, c2, c3 = st.columns([1,10,1])
-        if c1.button(".", key="secret"): st.session_state.show_login = True
-        c2.markdown("<div style='text-align:center; color:#666; font-size: 0.9rem;'>PGEAR. Hotline: 0931.863.070</div>", unsafe_allow_html=True)
+        
+        # Chia cột Footer: Cột trái (Nút ẩn) - Cột giữa (Thông tin) - Cột phải (Rỗng)
+        f_left, f_mid, f_right = st.columns([1, 8, 1])
+        
+        with f_left:
+            # NÚT BÍ MẬT: Chỉ hiện dấu chấm ".", bấm vào sẽ hiện popup login
+            if st.button(".", key="secret_login_btn"):
+                st.session_state.show_login = True
+        
+        with f_mid:
+            st.markdown("""
+                <div style="text-align:center; color:#888; font-size:0.9rem; font-family:'Inter', sans-serif;">
+                    <div style="margin-bottom: 8px;">PGEAR</div>
+                    <div style="margin-bottom: 8px;">Hotline/ Zalo: 0931863070</div>
+                    <div>
+                        Facebook/ Messenger: 
+                        <a href="https://www.facebook.com/thanh.phat.114166" target="_blank" 
+                           style="color: #29b5e8; text-decoration: none; font-weight: 700; transition: color 0.3s;">
+                            Thanh Phat
+                        </a>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+            
 
 if __name__ == "__main__":
     main()
