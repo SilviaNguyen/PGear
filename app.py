@@ -217,7 +217,7 @@ def main():
                             st.markdown("---")
                             c_price_1, c_price_2 = st.columns([1, 2])
                             c_price_1.caption("GIÁ:")
-                            c_price_2.markdown(f"<h3 style='color:#29b5e8; margin:0; text-align:right'>{item_data['sell_price']:,.0f}</h3>", unsafe_allow_html=True)
+                            c_price_2.markdown(f"<h3 style='color:#ffffff; margin:0; text-align:right'>{item_data['sell_price']:,.0f} VNĐ</h3>", unsafe_allow_html=True)
     else: 
         st.info("Chưa có dữ liệu.")
 
