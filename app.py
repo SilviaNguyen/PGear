@@ -174,18 +174,18 @@ def main():
                     st.rerun()
                 else: st.error("Sai mật khẩu")
 
-    render_banner("images/banner_main.jpg", "PGEAR", "High Performance")
+    render_banner("images/banner_main.jpg", "PGEAR", "Gaming Gear.")
     df_random = df.sample(n=min(6, len(df)))
     render_product_grid(df_random, "highlight")
     st.write("") 
 
-    render_banner("images/banner_main.jpg", "GAMING MOUSE", "High Performance")
+    render_banner("images/banner_main.jpg", "GAMING MOUSE", "Percise.")
     render_product_grid(df[df['category'] == 'Chuột'], "mouse")
 
-    render_banner("images/banner_keyboard.jpg", "KEYBOARD", "High Performance")
+    render_banner("images/banner_keyboard.jpg", "KEYBOARD", "Performance.")
     render_product_grid(df[df['category'] == 'Bàn phím'], "kb")
 
-    render_banner("images/banner_pad.jpg", "PGEAR", "High Performance")
+    render_banner("images/banner_pad.jpg", "PAD & AUDIO", "Pure Experience.")
 
     render_product_grid(df[df['category'].isin(['Lót chuột', 'Tai nghe', 'Ghế', 'Khác'])], "pad")
 
