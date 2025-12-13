@@ -1,225 +1,247 @@
 import streamlit as st
 import pandas as pd
 import backend as db  
-import styles         
+import styles
+import base64
+import os
 
-# --- CẤU HÌNH ---
-DRIVE_FOLDER_ID_RAW = "1qJD-JyJokrD5tRcp_AR6raVQAwnFNPuQ" 
-
+# --- CẤU HÌNH TRANG ---
 st.set_page_config(page_title="PGear", layout="wide", initial_sidebar_state="collapsed")
-url_fb = "https://www.facebook.com/thanh.phat.114166"
-link_text = "Thanh Phat"
-
 st.markdown(styles.CSS, unsafe_allow_html=True)
 
+# --- QUẢN LÝ SESSION ---
 if 'is_admin' not in st.session_state: st.session_state.is_admin = False
 if 'show_login' not in st.session_state: st.session_state.show_login = False
 
-# --- HÀM XỬ LÝ ID DRIVE THÔNG MINH ---
+# --- HÀM HỖ TRỢ ẢNH ---
+def get_base64_image(filename):
+    try:
+        if os.path.exists(filename):
+            with open(filename, 'rb') as f:
+                return base64.b64encode(f.read()).decode()
+    except: return None
+    return None
 
-# --- GIAO DIỆN CHÍNH ---
+# --- HÀM RENDER BANNER ---
+def render_banner(img_file, title, subtitle):
+    bin_str = get_base64_image(img_file)
+    if bin_str:
+        img_url = f"data:image/jpeg;base64,{bin_str}"
+    else:
+        img_url = "https://via.placeholder.com/1200x400/30363d/ffffff?text=BANNER"
+    
+    st.markdown(f"""
+        <div class="hero-box" style="background-image: url('{img_url}');">
+            <div class="hero-overlay">
+                <div class="hero-title">{title}</div>
+                <div class="hero-subtitle">{subtitle}</div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+# --- HÀM HIỂN THỊ LƯỚI SẢN PHẨM ---
+def render_product_grid(df_data, key_prefix):
+    if df_data.empty:
+        st.caption("Chưa có sản phẩm.")
+        return
+
+    rows = [df_data.iloc[i:i + 3] for i in range(0, len(df_data), 3)]
+    for row_idx, row in enumerate(rows):
+        cols = st.columns(3)
+        for col_idx, (col, item) in enumerate(zip(cols, row.iterrows())):
+            data = item[1]
+            unique_key = f"{key_prefix}_{data['id']}_{row_idx}_{col_idx}"
+            
+            with col:
+                with st.container(border=True):
+                    # Layout: Text bên trái (2.2) - Ảnh bên phải (1)
+                    c_info, c_img = st.columns([2.2, 1])
+                    
+                    with c_info:
+                        st.markdown(f"""
+                            <div style='font-weight:700; color:white; font-size:1.05rem; 
+                                        line-height:1.3; min-height:42px; 
+                                        display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;'>
+                                {data['name']}
+                            </div>
+                            """, unsafe_allow_html=True)
+                        st.markdown(f"<div style='font-size:0.75rem; color:#888; margin-top:4px; margin-bottom:8px;'>{data['category']}</div>", unsafe_allow_html=True)
+                        
+                        # Giá hiển thị cho khách
+                        if not st.session_state.is_admin:
+                            st.markdown(f"<div style='font-size:1.1rem; font-weight:bold; color:var(--success);'>{data['sell_price']:,.0f} đ</div>", unsafe_allow_html=True)
+                            st.caption(f"BH: {data['warranty_info']}")
+
+                    with c_img:
+                        img = str(data['image_url']).strip() or "https://via.placeholder.com/150"
+                        st.markdown(f"""
+                            <div style="
+                                width: 100%; height: 100px; 
+                                background: url('{img}') center center / cover no-repeat; 
+                                border-radius: 8px; border: 1px solid #333;
+                            "></div>
+                        """, unsafe_allow_html=True)
+
+                    # --- PHẦN ADMIN (CHỈ HIỆN KHI ĐĂNG NHẬP) ---
+                    if st.session_state.is_admin:
+                        st.markdown("---")
+                        
+                        # 1. TÍNH TOÁN LÃI/LỖ
+                        buy = data['buy_price']
+                        sell = data['sell_price']
+                        profit = sell - buy
+                        
+                        # Hiển thị 3 cột thông số
+                        ad_c1, ad_c2, ad_c3 = st.columns(3)
+                        ad_c1.markdown(f"<div style='font-size:0.7rem; color:#888'>VỐN</div><div style='color:white; font-weight:bold'>{buy:,.0f}</div>", unsafe_allow_html=True)
+                        ad_c2.markdown(f"<div style='font-size:0.7rem; color:#888'>BÁN</div><div style='color:white; font-weight:bold'>{sell:,.0f}</div>", unsafe_allow_html=True)
+                        ad_c3.markdown(f"<div style='font-size:0.7rem; color:#888'>LÃI</div><div style='color:#00c853; font-weight:bold'>{profit:,.0f}</div>", unsafe_allow_html=True)
+                        
+                        st.write("") # Khoảng cách nhỏ
+
+                        # 2. NÚT CHỨC NĂNG
+                        b1, b2, b3 = st.columns(3)
+                        is_sold = data['status'] == "Đã bán"
+                        
+                        if b1.button("TT", key=f"s_{unique_key}", type="secondary", help="Đổi trạng thái Bán/Còn"): 
+                            db.update_status(data['id'], "Sẵn hàng" if is_sold else "Đã bán")
+                            st.rerun()
+                        if b2.button("Sửa", key=f"e_{unique_key}"):
+                            st.session_state.edit_id = data['id']
+                            st.rerun()
+                        if b3.button("Xóa", key=f"d_{unique_key}"):
+                            db.delete_product(data['id'])
+                            st.rerun()
+
+# --- MAIN APP ---
 def main():
-    c_head_1, c_head_2 = st.columns([6, 1])
-    with c_head_1: st.markdown('<p class="bbh-bartle-regular">PGEAR</p>', unsafe_allow_html=True)
-    
+    # Load data
     df = db.load_data()
+    if not df.empty:
+        # Ép kiểu số để tính toán
+        df['buy_price'] = pd.to_numeric(df['buy_price'], errors='coerce').fillna(0)
+        df['sell_price'] = pd.to_numeric(df['sell_price'], errors='coerce').fillna(0)
+        
+        # Nếu không phải admin thì ẩn hàng đã bán
+        if not st.session_state.is_admin:
+            df = df[df['status'] == 'Sẵn hàng']
 
-    c_search, c_filter = st.columns([3, 1])
-    with c_search:
-        search_query = st.text_input("", placeholder="Tìm kiếm...", label_visibility="collapsed", key="search_input", autocomplete="off")
-    with c_filter:
-        categories = ["Tất cả"] + sorted(df['category'].dropna().unique().tolist()) if not df.empty else ["Tất cả"]
-        view_category = st.selectbox("", categories, label_visibility="collapsed")
+    # Header Logo (Bỏ nút Login ở đây)
+    st.markdown('<div style="font-family:\'BBH Bartle\'; font-size:2rem; color:white; margin-bottom:10px;">PGEAR</div>', unsafe_allow_html=True)
 
-    # LOGIN
-    if search_query == "#login#":
-        st.session_state.show_login = True
-        search_query = ""
-    
+    # Nút Đăng xuất (Chỉ hiện khi ĐÃ đăng nhập)
+    if st.session_state.is_admin:
+        if st.button("Đăng xuất Admin", type="primary"):
+            st.session_state.is_admin = False
+            st.rerun()
+
+    # Form Login Popup (Hiện khi bấm nút bí mật)
     if st.session_state.show_login and not st.session_state.is_admin:
-        with st.expander("Hi Phát", expanded=True):
-            password = st.text_input("", type="password")
-            if st.button("Xác nhận"):
-                correct_pass = db.get_admin_password()
-                if correct_pass and password == correct_pass:
+        with st.popover("Bảo mật", use_container_width=True):
+            pwd = st.text_input("Mật khẩu", type="password")
+            if st.button("Truy cập", type="primary", use_container_width=True):
+                if pwd == db.get_admin_password():
                     st.session_state.is_admin = True
                     st.session_state.show_login = False
                     st.rerun()
-                else: st.error("Sai mật khẩu!")
+                else:
+                    st.error("Sai mật khẩu")
 
-    # ADMIN SIDEBAR
+    # --- NỘI DUNG TRANG ---
+    
+    # 1. Main Banner
+    render_banner("images/banner_main.jpg", "PGEAR", "Gaming Gear")
+    df_random = df.sample(n=min(6, len(df)))
+    render_product_grid(df_random, "all")
+    st.write("") 
+
+    # 2. Mouse
+    render_banner("images/banner_mouse.jpg", "GAMING MOUSE", "Precise.")
+    df_mouse = df[df['category'] == 'Chuột']
+    render_product_grid(df_mouse, "mouse")
+    st.write("")
+
+    # 3. Keyboard
+    render_banner("images/banner_keyboard.jpg", "KEYBOARD", "Performance")
+    df_kb = df[df['category'] == 'Bàn phím']
+    render_product_grid(df_kb, "kb")
+    st.write("")
+
+    # 4. Other
+    render_banner("images/banner_pad.jpg", "MOUSEPAD & AUDIO", "Pure Experience.")
+    df_other = df[df['category'].isin(['Lót chuột', 'Tai nghe', 'Ghế', 'Khác'])]
+    render_product_grid(df_other, "pad")
+
+    # --- SIDEBAR ADMIN (Sửa/Thêm) ---
     if st.session_state.is_admin:
         with st.sidebar:
-            if st.button("ĐĂNG XUẤT"):
-                st.session_state.is_admin = False
-                st.rerun()
-            st.markdown("---")
-            
-            # Kiểm tra chế độ sửa hay thêm mới
+            st.title("QUẢN LÝ KHO")
             if 'edit_id' in st.session_state and st.session_state.edit_id:
-                st.header(f"CẬP NHẬT: ID {st.session_state.edit_id}")
-                
+                st.info(f"Đang sửa ID: {st.session_state.edit_id}")
                 edit_item = df[df['id'] == st.session_state.edit_id].iloc[0]
-                
                 with st.form("edit_form"):
-                    e_name = st.text_input("Tên sản phẩm", value=edit_item['name'])
-                    e_category = st.selectbox("Loại", ["Chuột", "Bàn phím", "Tai nghe", "Lót chuột", "Ghế", "Khác"], 
-                                             index=["Chuột", "Bàn phím", "Tai nghe", "Lót chuột", "Ghế", "Khác"].index(edit_item['category']) if edit_item['category'] in ["Chuột", "Bàn phím", "Tai nghe", "Lót chuột", "Ghế", "Khác"] else 0)
-                    
-                    st.caption("Hình ảnh (Để trống nếu không đổi)")
-                    e_uploaded_file = st.file_uploader("", type=['png', 'jpg', 'jpeg'], label_visibility="collapsed", key="e_img")
-                    
+                    e_name = st.text_input("Tên", value=edit_item['name'])
+                    e_category = st.selectbox("Loại", ["Chuột", "Bàn phím", "Tai nghe", "Lót chuột", "Ghế", "Khác"], index=["Chuột", "Bàn phím", "Tai nghe", "Lót chuột", "Ghế", "Khác"].index(edit_item['category']))
+                    e_file = st.file_uploader("Ảnh mới", type=['jpg','png'])
                     c1, c2 = st.columns(2)
-                    e_buy = c1.number_input("Giá nhập", step=50000, format="%d", value=int(edit_item['buy_price']) if edit_item['buy_price'] else 0)
-                    e_sell = c2.number_input("Giá bán", step=50000, format="%d", value=int(edit_item['sell_price']) if edit_item['sell_price'] else 0)
-                    e_condition = st.text_input("Tình trạng", value=edit_item['condition'])
-                    e_warranty = st.text_input("Bảo hành", value=edit_item['warranty_info'])
+                    e_buy = c1.number_input("Vốn", value=int(edit_item['buy_price']))
+                    e_sell = c2.number_input("Bán", value=int(edit_item['sell_price']))
+                    e_cond = st.text_input("Tình trạng", value=edit_item['condition'])
+                    e_warr = st.text_input("Bảo hành", value=edit_item['warranty_info'])
                     
-                    col_save, col_cancel = st.columns(2)
-                    submitted = col_save.form_submit_button("LƯU", type="primary")
-                    cancelled = col_cancel.form_submit_button("HỦY BỎ")
-
-                    if cancelled:
+                    if st.form_submit_button("Lưu Thay Đổi", type="primary"):
+                        url = ""
+                        if e_file: url = db.upload_image_to_drive(e_file, e_name)
+                        db.update_product_full(st.session_state.edit_id, e_name, e_category, e_buy, e_sell, e_cond, e_warr, url)
                         del st.session_state.edit_id
                         st.rerun()
-                    
-                    if submitted:
-                        with st.spinner("Đang cập nhật..."):
-                            final_img = ""
-                            if e_uploaded_file:
-                                final_img = db.upload_image_to_drive(e_uploaded_file, e_name)
-                            
-                            db.update_product_full(st.session_state.edit_id, e_name, e_category, e_buy, e_sell, e_condition, e_warranty, final_img)
-                        
-                        st.success("Đã cập nhật!")
-                        del st.session_state.edit_id
-                        st.rerun()
-
+                if st.button("Hủy bỏ"):
+                    del st.session_state.edit_id
+                    st.rerun()
             else:
-                # FORM THÊM MỚI
-                st.header("NHẬP KHO")
-                with st.form("add_form", clear_on_submit=True):
-                    name = st.text_input("Tên sản phẩm")
-                    category = st.selectbox("Loại", ["Chuột", "Bàn phím", "Tai nghe", "Lót chuột", "Ghế", "Khác"])
-                    
-                    st.caption("Hình ảnh (Google Drive)")
-                    uploaded_file = st.file_uploader("", type=['png', 'jpg', 'jpeg'], label_visibility="collapsed")
-                    
+                st.subheader("Thêm Sản Phẩm")
+                with st.form("add"):
+                    n = st.text_input("Tên SP")
+                    c = st.selectbox("Loại", ["Chuột", "Bàn phím", "Tai nghe", "Lót chuột", "Ghế", "Khác"])
+                    f = st.file_uploader("Ảnh")
                     c1, c2 = st.columns(2)
-                    buy = c1.number_input("Giá nhập", step=50000, format="%d")
-                    sell = c2.number_input("Giá bán", step=50000, format="%d")
-                    condition = st.text_input("Tình trạng")
-                    warranty = st.text_input("Bảo hành")
-                    
-                    if st.form_submit_button("LƯU SẢN PHẨM", type="primary"):
-                        if name:
-                            with st.spinner("Đang upload Drive & lưu..."):
-                                final_img_url = ""
-                                if uploaded_file:
-                                    final_img_url = db.upload_image_to_drive(uploaded_file, name)
-                                    if not final_img_url: st.stop()
-                                
-                                cond_val = condition if condition else "---"
-                                db.add_product(name, category, buy, sell, cond_val, warranty, final_img_url)
-                            st.success("Đã lưu!")
+                    b = c1.number_input("Vốn", step=50000)
+                    s = c2.number_input("Bán", step=50000)
+                    cond = st.text_input("Tình trạng")
+                    w = st.text_input("Bảo hành")
+                    if st.form_submit_button("Thêm Mới", type="primary"):
+                        if n:
+                            url = ""
+                            if f: url = db.upload_image_to_drive(f, n)
+                            db.add_product(n, c, b, s, cond or "-", w, url)
                             st.rerun()
-                        else: st.warning("Thiếu tên sản phẩm!")
 
-    # HIỂN THỊ DASHBOARD
-    if not df.empty:
-        df['buy_price'] = pd.to_numeric(df['buy_price'], errors='coerce').fillna(0)
-        df['sell_price'] = pd.to_numeric(df['sell_price'], errors='coerce').fillna(0)
-        inventory = df[df['status'] == 'Sẵn hàng']
-        sold = df[df['status'] == 'Đã bán']
+    # --- FOOTER & NÚT LOGIN ẨN ---
+    if not st.session_state.is_admin:
+        st.markdown("---")
         
-        if st.session_state.is_admin:
-            m1, m2, m3, m4 = st.columns(4)
-            m1.metric("KHO", f"{len(inventory)}")
-            m2.metric("VỐN", f"{inventory['buy_price'].sum()/1000000:,.1f}M")
-            m3.metric("ĐÃ BÁN", f"{len(sold)}")
-            profit = (sold['sell_price'] - sold['buy_price']).sum()
-            m4.metric("LÃI", f"{profit/1000000:,.1f}M")
-        else:
-            st.markdown('<p class="contact">Liên hệ mua hàng: 0931863070 (Zalo/ SMS)</p>', unsafe_allow_html=True)
+        # Chia cột Footer: Cột trái (Nút ẩn) - Cột giữa (Thông tin) - Cột phải (Rỗng)
+        f_left, f_mid, f_right = st.columns([1, 8, 1])
+        
+        with f_left:
+            # NÚT BÍ MẬT: Chỉ hiện dấu chấm ".", bấm vào sẽ hiện popup login
+            if st.button(".", key="secret_login_btn"):
+                st.session_state.show_login = True
+        
+        with f_mid:
             st.markdown("""
-            <p class="contact">
-                Facebook/ Messenger: 
-                <a href="https://www.facebook.com/thanh.phat.114166" target="_blank" style="text-decoration:bold; color:inherit;">
-                    Thanh Phat
-                </a>
-            </p>
+                <div style="text-align:center; color:#888; font-size:0.9rem; font-family:'Inter', sans-serif;">
+                    <div style="margin-bottom: 8px;">PGEAR</div>
+                    <div style="margin-bottom: 8px;">Hotline/ Zalo: 0931863070</div>
+                    <div>
+                        Facebook/ Messenger: 
+                        <a href="https://www.facebook.com/thanh.phat.114166" target="_blank" 
+                           style="color: #29b5e8; text-decoration: none; font-weight: 700; transition: color 0.3s;">
+                            Thanh Phat
+                        </a>
+                    </div>
+                </div>
             """, unsafe_allow_html=True)
-
-        df_display = df.copy()
-        if search_query and search_query != "#login#":
-            df_display = df_display[df_display['name'].astype(str).str.lower().str.contains(search_query.lower())]
-        if view_category != "Tất cả":
-            df_display = df_display[df_display['category'] == view_category]
-        if not st.session_state.is_admin:
-            df_display = df_display[df_display['status'] == 'Sẵn hàng']
-        
-        rows = [df_display.iloc[i:i + 3] for i in range(0, len(df_display), 3)]
-
-        for row in rows:
-            cols = st.columns(3)
-            for col, item in zip(cols, row.iterrows()):
-                item_data = item[1]
-                with col:
-                    with st.container(border=True):
-                        c_info, c_img = st.columns([7, 3])
-                        is_sold = item_data['status'] == "Đã bán"
-                        st_text, st_color = ("ĐÃ BÁN", "#00c853") if is_sold else ("SẴN HÀNG", "#29b5e8")
-                        
-                        with c_info:
-                            # 1. Dòng trạng thái (Sẵn hàng/Đã bán) - Bỏ category ở đây đi
-                            st.markdown(f"""
-                                <div style="margin-bottom:5px;">
-                                    <span style="color:{st_color}; font-weight:bold; border:1px solid {st_color}; padding:2px 6px; border-radius:4px; font-size:0.6rem;">{st_text}</span>
-                                </div>""", unsafe_allow_html=True)
-                            
-                            # 2. Tên sản phẩm + Category nằm phía trước
-                            # Tạo html cho category (màu xanh, trong ngoặc vuông)
-                            cat_html = f"<span style='color:#29b5e8; font-size:0.9em; font-weight:bold'>{item_data['category']}</span>"
-                            
-                            # Ghép vào trước tên sản phẩm
-                            st.markdown(f"<h4 style='margin:0; font-size:1rem; min-height:40px; line-height:1.4'>{cat_html} {item_data['name']}</h4>", unsafe_allow_html=True)
-                            
-                            # 3. Thông tin bảo hành (Giữ nguyên)
-                            st.caption(f"BH: {item_data['warranty_info']} | {item_data['condition']}")
-
-                        with c_img:
-                            img_link = str(item_data['image_url']).strip()
-                            if not img_link: img_link = "https://via.placeholder.com/150/1e252b/FFFFFF?text=PGEAR"
-                            st.markdown(f"""
-                                <div style="width:100%; padding-top:100%; background:url('{img_link}') center/cover no-repeat; border-radius:8px; border:1px solid #30363d;"></div>
-                            """, unsafe_allow_html=True)
-
-                        if st.session_state.is_admin:
-                            p1, p2, p3 = st.columns(3)
-                            profit = item_data['sell_price'] - item_data['buy_price']
-                            p_color = "#00c853" if profit > 0 else "#ff5252"
-                            p1.markdown(f"<div style='font-size:0.8rem; color:#9e9e9e'>GỐC<br><b style='color:white'>{item_data['buy_price']/1000:,.0f}k</b></div>", unsafe_allow_html=True)
-                            p2.markdown(f"<div style='font-size:0.8rem; color:#9e9e9e'>BÁN<br><b style='color:white'>{item_data['sell_price']/1000:,.0f}k</b></div>", unsafe_allow_html=True)
-                            p3.markdown(f"<div style='font-size:0.8rem; color:#9e9e9e'>LÃI<br><b style='color:{p_color}'>{profit/1000:,.0f}k</b></div>", unsafe_allow_html=True)
-                            
-                            st.write("")
-                            b1, b2, b3 = st.columns([1.5, 1, 1])
-                            if b1.button("ĐỔI TT", key=f"s_{item_data['id']}", type="secondary" if is_sold else "primary", use_container_width=True):
-                                db.update_status(item_data['id'], "Sẵn hàng" if is_sold else "Đã bán")
-                                st.rerun()
-                            if b2.button("SỬA", key=f"e_{item_data['id']}", type="secondary", use_container_width=True):
-                                st.session_state.edit_id = item_data['id']
-                                st.rerun()
-                            if b3.button("XÓA", key=f"d_{item_data['id']}", type="secondary", use_container_width=True):
-                                db.delete_product(item_data['id'])
-                                st.rerun()
-                        else:
-                            st.markdown("---")
-                            c_price_1, c_price_2 = st.columns([1, 2])
-                            c_price_1.caption("GIÁ:")
-                            c_price_2.markdown(f"<h3 style='color:#ffffff; margin:0; text-align:right'>{item_data['sell_price']:,.0f} VNĐ</h3>", unsafe_allow_html=True)
-    else: 
-        st.info("Chưa có dữ liệu.")
 
 if __name__ == "__main__":
     main()
