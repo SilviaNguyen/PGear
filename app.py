@@ -73,7 +73,8 @@ def show_product_detail(item):
 
     st.markdown(f"""
         <div style="border-radius: 12px; overflow: hidden; margin-bottom: 20px; border: 1px solid #30363d;">
-            <img src="{img_url}" style="width: 100%; object-fit: fill;">
+        <div style="width: 100%; height: 350px; display: flex; align-items: center; justify-content: center; background: #161b22;">
+            <img src="{img_url}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
         </div>
         <h2 style='font-weight: 800; margin-bottom: 8px; font-size: 1.5rem; line-height: 1.2;'>{item['name']}</h2>
         
@@ -110,8 +111,12 @@ def render_single_card(data, key_prefix):
     with st.container(border=True):
         img = str(data['image_url']).strip() or "https://via.placeholder.com/400x300"
         st.markdown(f"""
-            <div style="width: 100%; height: 220px; background: url('{img}') center center / cover no-repeat; 
-                border-bottom: 1px solid #252a30; margin-bottom: 12px; border-radius: 5px;"></div>
+            <div style="width: 100%; height: 220px; background-color: #20252b; 
+                        display: flex; align-items: center; justify-content: center;
+                        border-bottom: 1px solid #252a30; margin-bottom: 12px; 
+                        border-radius: 5px 5px 0 0; overflow: hidden;">
+                <img src="{img}" style="width: 100%; height: 100%; object-fit: contain; transition: transform 0.3s ease;">
+            </div>
         """, unsafe_allow_html=True)
 
         st.markdown(f"""

@@ -110,5 +110,8 @@ CSS = """
         .hero-title { font-size: 2.5rem !important; }
         .hero-box { height: 220px !important; }
     }
+    div[data-testid="stVerticalBlockBorderWrapper"]:hover img {
+        transform: scale(1.1);
+    }
 </style>
 """
