@@ -215,7 +215,7 @@ def render_shop_interface(df_full):
         st.markdown("---")
 
         # 2. Section Chuột
-        render_banner("images/banner_main.jpg", "GAMING MOUSE", "Precise.")
+        render_banner("images/banner_mouse.jpg", "GAMING MOUSE", "Precise.")
         render_product_grid(filtered_df[filtered_df['category'] == 'Chuột'], "mouse_home")
 
         # 3. Section Phím
