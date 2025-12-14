@@ -144,7 +144,7 @@ def render_single_card(data, key_prefix):
 
 def render_product_grid(df_data, key_prefix):
     if df_data.empty:
-        st.info("Không tìm thấy sản phẩm nào phù hợp.")
+        st.info("Hong có ròi.")
         return
 
     # Sắp xếp sản phẩm mới nhất lên đầu
@@ -195,7 +195,7 @@ def render_shop_interface(df_full):
     if view_mode in ["search", "category"]:
         # Lấy banner từ config, nếu search thì dùng banner chung
         if view_mode == "search":
-            banner_info = {"img": "images/banner_main.jpg", "title": f"TÌM KIẾM: {search_query}", "sub": "Search Results"}
+            banner_info = {"img": "images/banner_main.jpg", "title": f"Find: {search_query}", "sub": "Search Results"}
         else:
             banner_info = BANNER_MAP.get(selected_cat, BANNER_MAP["Tất cả"])
             
