@@ -195,7 +195,7 @@ def render_shop_interface(df_full):
     if view_mode in ["search", "category"]:
         # Lấy banner từ config, nếu search thì dùng banner chung
         if view_mode == "search":
-            banner_info = {"img": "images/banner_main.jpg", "title": f"Find: {search_query}", "sub": "Search Results"}
+            banner_info = {"img": "images/banner_main.jpg", "title": f"Find: {search_query}", "sub": ""}
         else:
             banner_info = BANNER_MAP.get(selected_cat, BANNER_MAP["Tất cả"])
             
