@@ -66,12 +66,10 @@ def show_product_detail(item):
     
     admin_html = ""
     if st.session_state.is_admin:
-        admin_html = f"""
-            <div class="detail-info-row">
+        admin_html = (f"""<div class="detail-info-row">
                 <span class="detail-label">Giá vốn (Admin)</span>
                 <span class="detail-value">{item['buy_price']:,.0f} VNĐ</span>
-            </div>
-        """
+            </div>""")
 
     st.markdown(f"""
         <div style="border-radius: 12px; overflow: hidden; margin-bottom: 20px; border: 1px solid #30363d;">
@@ -216,12 +214,14 @@ def render_shop_interface(df_full):
         render_banner(BANNER_MAP["Trang chủ"]["img"], BANNER_MAP["Trang chủ"]["title"], BANNER_MAP["Trang chủ"]["sub"])
         
         if not filtered_df.empty:
-            st.subheader("Có thể bạn thích")
-            sample_size = min(6, len(filtered_df))
-            df_random = filtered_df.sample(n=sample_size)
-            render_product_grid(df_random, "highlight")
-            st.write("")
-            st.markdown("---")
+                    st.subheader("Có thể bạn thích")
+                    if 'suggested_ids' not in st.session_state:
+                        sample_size = min(6, len(filtered_df))
+                        st.session_state.suggested_ids = filtered_df.sample(n=sample_size)['id'].tolist()
+                    df_random = filtered_df[filtered_df['id'].isin(st.session_state.suggested_ids)]
+                    render_product_grid(df_random, "highlight")
+                    st.write("")
+                    st.markdown("---")
 
         render_banner("images/banner_mouse.jpg", "GAMING MOUSE", "Precise.")
         render_product_grid(filtered_df[filtered_df['category'] == 'Chuột'], "mouse_home")
