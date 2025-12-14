@@ -1,0 +1,13 @@
+name: streamlit
+
+on:
+  schedule:
+    - cron: "*/200 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping_app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check website status
+        run: curl -I https://pgearzzz.streamlit.app/
