@@ -185,7 +185,7 @@ def render_shop_interface(df_full):
              st.session_state.main_search_input = ""
              
         st.text_input("Tìm kiếm", 
-                      placeholder="Nhập tên SP...", 
+                      placeholder="Tìm kiếm ...", 
                       label_visibility="collapsed",
                       key="main_search_input",
                       on_change=on_search_change)
