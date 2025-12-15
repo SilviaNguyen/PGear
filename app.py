@@ -112,18 +112,16 @@ def render_single_card(data, key_prefix):
         img = str(data['image_url']).strip() or "https://via.placeholder.com/400x300"
         
         st.markdown(f"""
-            <div style="width: 100%; height: 220px; position: relative;
-                        border-bottom: 1px solid #252a30; margin-bottom: 12px; 
-                        border-radius: 5px 5px 0 0; overflow: hidden;">
-                <!-- Background blurred image -->
+            <div style=
+                "width: 100%; height: 220px; position: relative;
+                border-bottom: 1px solid #252a30; margin-bottom: 12px; 
+                border-radius: 5px 5px 0 0; overflow: hidden;">
                 <div style="position: absolute; inset: 0; background-image: url('{img}');
-                            background-size: cover; background-position: center;
-                            filter: blur(20px) brightness(0.4); transform: scale(1.2);"></div>
-                <!-- Main image -->
-                <div style="position: relative; width: 100%; height: 100%;
-                            display: flex; align-items: center; justify-content: center;">
-                    <img src="{img}" style="max-width: 90%; max-height: 90%; object-fit: contain; 
-                                            transition: transform 0.3s ease; z-index: 1;">
+                background-size: cover; background-position: center;
+                filter: blur(20px) brightness(0.4); transform: scale(1.2);"></div>
+                <div style="position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                <img src="{img}" style="max-width: 100%; border-radius: 8px; max-height: 100%; object-fit: contain; 
+                transition: transform 0.3s ease; z-index: 1;">
                 </div>
             </div>
         """, unsafe_allow_html=True)
