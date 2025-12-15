@@ -65,7 +65,7 @@ def upload_image_to_drive(image_file, product_name):
 
 # [FIX]: Thêm TTL (Time To Live) để cache dữ liệu trong 10 phút, giúp app cực nhanh
 # App sẽ không gọi Google Sheet mỗi lần render lại nữa
-@st.cache_data(ttl=600) 
+@st.cache_data(ttl=1800, show_spinner=False) 
 def load_data():
     try:
         sheet = connect_to_sheet()
