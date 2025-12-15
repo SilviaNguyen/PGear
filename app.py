@@ -110,12 +110,21 @@ def render_single_card(data, key_prefix):
     unique_key = f"{key_prefix}_{data['id']}"
     with st.container(border=True):
         img = str(data['image_url']).strip() or "https://via.placeholder.com/400x300"
+        
         st.markdown(f"""
-            <div style="width: 100%; height: 220px; background-color: #20252b; 
-                        display: flex; align-items: center; justify-content: center;
+            <div style="width: 100%; height: 220px; position: relative;
                         border-bottom: 1px solid #252a30; margin-bottom: 12px; 
                         border-radius: 5px 5px 0 0; overflow: hidden;">
-                <img src="{img}" style="width: 100%; height: 100%; object-fit: contain; transition: transform 0.3s ease;">
+                <!-- Background blurred image -->
+                <div style="position: absolute; inset: 0; background-image: url('{img}');
+                            background-size: cover; background-position: center;
+                            filter: blur(20px) brightness(0.4); transform: scale(1.2);"></div>
+                <!-- Main image -->
+                <div style="position: relative; width: 100%; height: 100%;
+                            display: flex; align-items: center; justify-content: center;">
+                    <img src="{img}" style="max-width: 90%; max-height: 90%; object-fit: contain; 
+                                            transition: transform 0.3s ease; z-index: 1;">
+                </div>
             </div>
         """, unsafe_allow_html=True)
 
