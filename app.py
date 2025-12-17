@@ -9,22 +9,18 @@ from datetime import datetime
 st.set_page_config(page_title="PGear", layout="wide")
 st.markdown(styles.CSS, unsafe_allow_html=True)
 
-# --- KHỞI TẠO STATE & DỮ LIỆU ---
 if 'is_admin' not in st.session_state: st.session_state.is_admin = False
 if 'show_login' not in st.session_state: st.session_state.show_login = False
 if 'search_term' not in st.session_state: st.session_state.search_term = ""
 if 'selected_category' not in st.session_state: st.session_state.selected_category = "Trang chủ"
 
-# LOAD DỮ LIỆU VÀO SESSION STATE (Chỉ chạy 1 lần)
 if 'master_df' not in st.session_state:
     st.session_state.master_df = db.fetch_data_from_sheet()
 
-# Hàm để Admin bấm nút "Làm mới" nếu cần
 def force_refresh_data():
     st.session_state.master_df = db.fetch_data_from_sheet()
-    st.toast("Đã cập nhật dữ liệu mới nhất từ Sheet!", icon="✅")
+    st.toast("Đã cập nhật dữ liệu mới nhất từ Sheet!")
 
-# --- CÁC HÀM HỖ TRỢ CLIENT (BANNER, IMAGE...) ---
 BANNER_MAP = {
     "Trang chủ": {"img": "images/pgear.jpg", "title": "PGEAR", "sub": ""},
     "Tất cả":   {"img": "images/banner_main.jpg", "title": "ALL PRODUCTS", "sub": ""},
@@ -143,7 +139,6 @@ def render_shop_interface(df_full):
 
     st.markdown("---")
     
-    # Chỉ hiển thị hàng "Sẵn hàng" ở Shop
     if not df_full.empty:
         df_visible = df_full[df_full['status'] == 'Sẵn hàng'].copy()
     else:
@@ -165,6 +160,7 @@ def render_shop_interface(df_full):
         render_product_grid(df_visible, f"grid_{view_mode}")
     else:
         render_banner(BANNER_MAP["Trang chủ"]["img"], BANNER_MAP["Trang chủ"]["title"], BANNER_MAP["Trang chủ"]["sub"])
+        
         if not df_visible.empty:
             st.subheader("Có thể bạn thích")
             if 'suggested_ids' not in st.session_state:
@@ -172,27 +168,35 @@ def render_shop_interface(df_full):
                 st.session_state.suggested_ids = df_visible.sample(n=sample_size)['id'].tolist()
             render_product_grid(df_visible[df_visible['id'].isin(st.session_state.suggested_ids)], "highlight")
             st.markdown("---")
-        render_banner("images/banner_mouse.jpg", "GAMING MOUSE", "Precise.")
-        render_product_grid(df_visible[df_visible['category'] == 'Chuột'], "mouse_home")
+            
+            categories_to_show = [
+                {"name": "Chuột", "banner_key": "Chuột"},
+                {"name": "Bàn phím", "banner_key": "Bàn phím"},
+                {"name": "Tai nghe", "banner_key": "Tai nghe"},
+                {"name": "Lót chuột", "banner_key": "Lót chuột"},
+                {"name": "Khác", "banner_key": "Khác"}
+            ]
+            
+            for cat_info in categories_to_show:
+                cat_name = cat_info["name"]
+                cat_data = df_visible[df_visible['category'] == cat_name]
+                if not cat_data.empty:
+                    banner_info = BANNER_MAP.get(cat_info["banner_key"], BANNER_MAP["Tất cả"])
+                    render_banner(banner_info["img"], banner_info["title"], banner_info["sub"])
+                    render_product_grid(cat_data, f"{cat_name.lower().replace(' ', '_')}_home")
+                    st.markdown("---")
 
-# --- GIAO DIỆN ADMIN TỐI ƯU ---
 def render_admin_dashboard():
-    # Sử dụng df từ session state, không load lại từ db
     df = st.session_state.master_df.copy()
-    
+
     st.markdown("### QUẢN LÝ KHO")
-    
-    # Search cục bộ
     search_query = st.text_input("Tìm kiếm tên hoặc ID sản phẩm...", key="admin_search_box")
     if search_query:
         df = df[
             df['name'].str.contains(search_query, case=False, na=False, regex=False) | 
             df['id'].astype(str).str.contains(search_query, regex=False)
         ]
-    
     df = df.sort_values(by='id', ascending=False)
-
-    # Header
     st.markdown("""
     <div style="display: flex; background: #21262d; padding: 10px; border-radius: 6px; font-weight: bold; color: #b0b3b8; margin-top: 10px;">
         <div style="width: 5%;">ID</div>
@@ -205,10 +209,7 @@ def render_admin_dashboard():
         <div style="width: 7%; text-align: center;">Menu</div>
     </div>
     """, unsafe_allow_html=True)
-
-    # Render List
     for idx, row in df.iterrows():
-        # Tìm index thực trong master_df để update chính xác
         real_index = st.session_state.master_df[st.session_state.master_df['id'] == row['id']].index[0]
         
         status_text = "Sẵn" if row['status'] == 'Sẵn hàng' else "Đã bán"
@@ -228,21 +229,13 @@ def render_admin_dashboard():
             c4.markdown(f"<div style='padding-top: 15px; font-size: 0.85rem; color: #888;'>{row['category']}</div>", unsafe_allow_html=True)
             c5.markdown(f"<div style='padding-top: 15px; text-align: right; color: #b0b3b8;'>{row['buy_price']:,.0f}</div>", unsafe_allow_html=True)
             c6.markdown(f"<div style='padding-top: 15px; text-align: right; color: #29b5e8; font-weight: bold;'>{row['sell_price']:,.0f}</div>", unsafe_allow_html=True)
-            
-            # --- NÚT TRẠNG THÁI (OPTIMIZED) ---
             with c7:
                 st.write("")
-                # Dùng key duy nhất
                 if st.button(status_text, key=f"st_{row['id']}", use_container_width=True):
                     new_val = "Đã bán" if row['status'] == 'Sẵn hàng' else "Sẵn hàng"
-                    # 1. Update API Ngầm
                     db.update_status(row['id'], new_val)
-                    # 2. Update Local State ngay lập tức
                     st.session_state.master_df.at[real_index, 'status'] = new_val
-                    # 3. Rerun để render lại giao diện (lấy từ local)
                     st.rerun()
-
-            # --- MENU (OPTIMIZED) ---
             with c8:
                 st.write("")
                 pop = st.popover("...", use_container_width=True)
@@ -251,25 +244,19 @@ def render_admin_dashboard():
                     st.rerun()
                 if pop.button("Xóa", key=f"del_{row['id']}", type="primary", use_container_width=True):
                     db.delete_product(row['id'])
-                    # Xóa khỏi local state
                     st.session_state.master_df = st.session_state.master_df.drop(real_index)
                     st.rerun()
-            
             st.markdown("<div style='border-bottom: 1px solid #30363d; margin: 4px 0;'></div>", unsafe_allow_html=True)
 
-# --- MAIN APP ---
 def main():
-    # Đảm bảo cột số đúng định dạng
     if not st.session_state.master_df.empty:
         st.session_state.master_df['buy_price'] = pd.to_numeric(st.session_state.master_df['buy_price'], errors='coerce').fillna(0)
         st.session_state.master_df['sell_price'] = pd.to_numeric(st.session_state.master_df['sell_price'], errors='coerce').fillna(0)
 
-    # --- ADMIN SIDEBAR ---
     if st.session_state.is_admin:
         with st.sidebar:
             st.title("QUẢN LÝ")
-            
-            # Nút làm mới dữ liệu thủ công
+
             if st.button("Làm mới dữ liệu", use_container_width=True):
                 force_refresh_data()
                 st.rerun()
@@ -278,11 +265,9 @@ def main():
                 st.session_state.is_admin = False
                 st.rerun()
             st.divider()
-            
-            # LOGIC SỬA (Optimized)
+
             if 'edit_id' in st.session_state and st.session_state.edit_id:
                 st.info(f"Đang sửa ID: {st.session_state.edit_id}")
-                # Lấy item từ local state
                 current_item = st.session_state.master_df[st.session_state.master_df['id'] == st.session_state.edit_id]
                 
                 if not current_item.empty:
@@ -309,10 +294,8 @@ def main():
                             url = edit_item['image_url']
                             if e_file: url = db.upload_image_to_drive(e_file, e_name)
                             
-                            # 1. API Update
                             db.update_product_full(st.session_state.edit_id, e_name, e_category, e_buy, e_sell, e_cond, e_warr, url)
                             
-                            # 2. Local Update
                             st.session_state.master_df.at[real_idx, 'name'] = e_name
                             st.session_state.master_df.at[real_idx, 'category'] = e_category
                             st.session_state.master_df.at[real_idx, 'buy_price'] = e_buy
@@ -330,8 +313,7 @@ def main():
                 if st.button("Hủy bỏ"):
                     del st.session_state.edit_id
                     st.rerun()
-            
-            # LOGIC THÊM MỚI (Optimized)
+        
             else:
                 st.subheader("Thêm sản phẩm")
                 with st.form("add"):
@@ -347,10 +329,7 @@ def main():
                         if n:
                             url = ""
                             if f: url = db.upload_image_to_drive(f, n)
-                            # 1. API Add (Nhận về ID mới)
                             new_id = db.add_product(n, c, b, s, cond or "2nd", w or "Bao test", url)
-                            
-                            # 2. Local Add (Tạo row mới và append vào session state)
                             new_row = {
                                 'id': new_id, 'name': n, 'category': c, 'buy_price': b, 'sell_price': s,
                                 'status': 'Sẵn hàng', 'condition': cond or "2nd", 'warranty_info': w or "Bao test",
@@ -359,9 +338,7 @@ def main():
                             st.session_state.master_df = pd.concat([pd.DataFrame([new_row]), st.session_state.master_df], ignore_index=True)
                             
                             st.toast("Thêm thành công!")
-                            st.rerun()
-
-    # --- VIEW CONTROL ---
+                            st.rerun()    
     if st.session_state.is_admin:
         render_admin_dashboard()
     else:
