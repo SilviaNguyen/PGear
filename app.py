@@ -247,7 +247,6 @@ def render_shop_interface(df_full):
 
 def main():
     df = db.load_data()
-    
     if not df.empty:
         df['buy_price'] = pd.to_numeric(df['buy_price'], errors='coerce').fillna(0)
         df['sell_price'] = pd.to_numeric(df['sell_price'], errors='coerce').fillna(0)
@@ -309,7 +308,7 @@ def main():
 
     # --- HEADER ---
     h1, h2 = st.columns([4,1])
-    with h1: st.markdown('<div style="font-family:\'BBH Bartle\'; font-size:2.5rem; color:white; text-shadow: 0 0 15px var(--primary-glow);">PGEAR</div>', unsafe_allow_html=True)
+    with h1: st.markdown('', unsafe_allow_html=True)
     with h2:
         if st.session_state.is_admin and st.button("Thoát Admin"):
             st.session_state.is_admin = False

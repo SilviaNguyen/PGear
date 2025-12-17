@@ -4,7 +4,7 @@ CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=BBH+Bartle&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-            
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;700&display=swap');        
     /* --- CẤU HÌNH CHUNG --- */
     .stApp { 
         background-color: #0b0e11; 
@@ -26,6 +26,8 @@ CSS = """
         --bg-card: #161b22; 
         --bg-card-hover: #1c2128;
         --border-color: #30363d;
+        --primary1: #00f2ff;
+        --silver: #e0e0e0; 
     }
 
     /* Scrollbar */
