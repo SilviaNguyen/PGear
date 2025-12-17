@@ -39,34 +39,24 @@ def connect_to_sheet():
 
 # --- HÀM UPLOAD ẢNH ---
 def upload_image_to_drive(image_file, product_name):
-    if not REAL_FOLDER_ID or "PASTE" in REAL_FOLDER_ID:
-        st.error("Chưa cấu hình Folder ID!")
-        return ""
+    if not REAL_FOLDER_ID or "PASTE" in REAL_FOLDER_ID: return ""
     try:
         creds = get_credentials()
         service = build('drive', 'v3', credentials=creds)
-        
         file_metadata = {
             'name': f"{product_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg",
             'parents': [REAL_FOLDER_ID]
         }
-        
         media = MediaIoBaseUpload(image_file, mimetype=image_file.type, resumable=True)
         file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         file_id = file.get('id')
-        
         service.permissions().create(fileId=file_id, body={'type': 'anyone', 'role': 'reader'}).execute()
         return f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
-    except Exception as e:
-        st.error(f"Lỗi upload ảnh: {e}")
-        return ""
+    except: return ""
 
-# --- CÁC HÀM XỬ LÝ DỮ LIỆU (ĐÃ TỐI ƯU CACHE) ---
-
-# [FIX]: Thêm TTL (Time To Live) để cache dữ liệu trong 10 phút, giúp app cực nhanh
-# App sẽ không gọi Google Sheet mỗi lần render lại nữa
-@st.cache_data(ttl=1800, show_spinner=False) 
-def load_data():
+# --- DATA LOADING (CHỈ LOAD LẦN ĐẦU) ---
+def fetch_data_from_sheet():
+    """Hàm này chỉ gọi khi thực sự cần lấy dữ liệu mới từ Google"""
     try:
         sheet = connect_to_sheet()
         data = sheet.get_all_records()
@@ -81,78 +71,63 @@ def load_data():
             df['id'] = pd.to_numeric(df['id'], errors='coerce')
             df = df.sort_values(by='id', ascending=False)
         return df
-    except Exception as e:
+    except:
         return pd.DataFrame()
 
-# Hàm xóa cache để ép load lại dữ liệu mới khi có thay đổi
-def clear_cache():
-    load_data.clear()
-
+# --- CÁC HÀM UPDATE (KHÔNG GỌI CLEAR CACHE NỮA) ---
 def add_product(name, category, buy_price, sell_price, condition, warranty_info, image_url):
     sheet = connect_to_sheet()
     data = sheet.get_all_records()
     ids = [int(row['id']) for row in data if str(row['id']).isdigit()]
     new_id = max(ids) + 1 if ids else 1
-    
     date_added = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Ghi lên Sheet
     sheet.append_row([new_id, name, category, buy_price, sell_price, "Sẵn hàng", condition, warranty_info, date_added, image_url])
-    clear_cache() # [FIX]: Xóa cache ngay sau khi thêm
+    return new_id # Trả về ID mới để App cập nhật vào Session State
 
 def find_cell_by_id(sheet, product_id):
     try:
         cell = sheet.find(str(product_id), in_column=1)
         return cell
-    except:
-        return None
+    except: return None
 
 def update_product_full(p_id, name, category, buy, sell, condition, warranty, image_url):
     try:
         sheet = connect_to_sheet()
         cell = find_cell_by_id(sheet, p_id)
-        
         if cell:
             r = cell.row
+            # Update hàng loạt cell bằng range update (nhanh hơn update từng cell)
+            # Cột B(2) đến H(8) và J(10)
             sheet.update_cell(r, 2, name)
             sheet.update_cell(r, 3, category)
             sheet.update_cell(r, 4, int(buy) if buy else 0)
             sheet.update_cell(r, 5, int(sell) if sell else 0)
             sheet.update_cell(r, 7, condition)
             sheet.update_cell(r, 8, warranty)
-            
-            if image_url and image_url.strip() != "":
-                sheet.update_cell(r, 10, image_url)
-                
-            clear_cache() # [FIX]: Xóa cache sau khi sửa
+            if image_url: sheet.update_cell(r, 10, image_url)
             return True
-        else:
-            st.error(f"Không tìm thấy ID: {p_id}")
-            return False
-    except Exception as e:
-        st.error(f"Lỗi khi lưu: {e}")
-        return False
+    except: pass
+    return False
 
 def update_status(product_id, new_status):
     try:
         sheet = connect_to_sheet()
         cell = find_cell_by_id(sheet, product_id)
-        if cell: 
-            sheet.update_cell(cell.row, 6, new_status)
-            clear_cache() # [FIX]: Xóa cache sau khi đổi trạng thái
-    except Exception as e:
-        st.error(f"Lỗi đổi trạng thái: {e}")
+        if cell: sheet.update_cell(cell.row, 6, new_status)
+    except: pass
 
 def delete_product(product_id):
     try:
         sheet = connect_to_sheet()
         cell = find_cell_by_id(sheet, product_id)
-        if cell: 
-            sheet.delete_rows(cell.row)
-            clear_cache() # [FIX]: Xóa cache sau khi xóa
+        if cell: sheet.delete_rows(cell.row)
     except: pass
 
-def get_admin_password():
-    try:
-        if "admin_password" in st.secrets: return st.secrets["admin_password"]
-        elif "general" in st.secrets: return st.secrets["general"].get("admin_password")
-    except: pass
+def get_admin_password():     
+    try:         
+        if "admin_password" in st.secrets: return st.secrets["admin_password"]     
+        elif "general" in st.secrets: return st.secrets["general"].get("admin_password")  
+    except: 
+        pass     
     return None

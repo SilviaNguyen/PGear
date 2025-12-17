@@ -69,6 +69,7 @@ CSS = """
         border-radius: 16px; padding: 0px; overflow: hidden;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        border-color: rgba(255,255,255,0.05) !important;
     }
     div[data-testid="stVerticalBlockBorderWrapper"]:hover {
         transform: translateY(-5px) scale(1.01);
@@ -87,7 +88,18 @@ CSS = """
     .detail-price-box { border-radius: 8px; padding: 10px; text-align: center; margin: 10px 0; border: 1px solid var(--success-glow); }
     .detail-price-label { color: var(--success); font-size: 0.9rem; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px;}
     .detail-price-value { color: var(--success); font-size: 1.5rem; font-weight: 800; text-shadow: 0 0 15px var(--success-glow); }
-    .detail-contact-bar { background: #1c2128; padding: 15px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 500; border: 1px solid #30363d; }
+    .detail-contact-bar { 
+        background: #161b22; 
+        padding: 15px; 
+        border-radius: 12px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center; 
+        color: white; 
+        font-weight: 500; 
+        /* Xóa viền cũ hoặc làm mờ nó */
+        border: 1px solid rgba(255,255,255,0.08); 
+    }
 
     /* --- FILTER BAR (NEW) --- */
     /* Làm đẹp thanh tìm kiếm */
