@@ -6,7 +6,7 @@ import base64
 import os
 from datetime import datetime
 
-st.set_page_config(page_title="PGear", layout="wide")
+st.set_page_config(page_title="PGear",initial_sidebar_state="expanded", layout="wide")
 st.markdown(styles.CSS, unsafe_allow_html=True)
 
 if 'is_admin' not in st.session_state: st.session_state.is_admin = False
@@ -263,6 +263,8 @@ def main():
                 
             if st.button("Đăng xuất", type="primary", use_container_width=True):
                 st.session_state.is_admin = False
+                if 'edit_id' in st.session_state: 
+                    del st.session_state.edit_id
                 st.rerun()
             st.divider()
 
